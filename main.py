@@ -23,25 +23,35 @@ class MyAPI:
 
             if method == "GET":
                 if path == "/inspect":
-                    params = {}
-                    q = query or ""
-                    if q:
-                        for pair in q.split("&"):
+                    query_params = {}
+                    query_string = query or ""
+                    if query_string:
+                        for pair in query_string.split("&"):
                             if "=" in pair:
-                                k, v = pair.split("=", 1)
+                                key, value = pair.split("=", 1)
                             else:
-                                k, v = pair, ""
-                            if k in params:
-                                params[k].append(v)
+                                key, value = pair, ""
+                            if key in query_params:
+                                query_params[key].append(value)
                             else:
-                                params[k] = [v]
-                    headers_dict = {}
-                    for k, v in environ.items():
-                        if k.startswith("HTTP_") or k in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-                            pretty = k.replace("HTTP_", "").replace("_", "-").title()
-                            headers_dict[pretty] = str(v)
-                    params_rows = "".join(f"<tr><td>{k}</td><td>{', '.join(v)}</td></tr>" for k, v in params.items()) or "<tr><td colspan='2'><em>No query parameters</em></td></tr>"
-                    headers_rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in sorted(headers_dict.items())) or "<tr><td colspan='2'><em>No headers</em></td></tr>"
+                                query_params[key] = [value]
+
+                    request_headers = {}
+                    for header_key, header_value in environ.items():
+                        if header_key.startswith("HTTP_") or header_key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                            header_name = header_key.replace("HTTP_", "").replace("_", "-").title()
+                            request_headers[header_name] = str(header_value)
+
+                    params_rows = "".join(
+                        f"<tr><td>{key}</td><td>{', '.join(values)}</td></tr>"
+                        for key, values in query_params.items()
+                    ) or "<tr><td colspan='2'><em>No query parameters</em></td></tr>"
+
+                    headers_rows = "".join(
+                        f"<tr><td>{name}</td><td>{value}</td></tr>"
+                        for name, value in sorted(request_headers.items())
+                    ) or "<tr><td colspan='2'><em>No headers</em></td></tr>"
+
                     html = f"""
                     <html>
                       <head><title>Request Inspection</title></head>
@@ -73,14 +83,14 @@ class MyAPI:
 
                 if path in file_map:
                     try:
-                        with open(file_map[path], "r", encoding="utf-8") as f:
-                            content = f.read()
+                        with open(file_map[path], "r", encoding="utf-8") as file:
+                            content = file.read()
                         body = content.encode("utf-8")
                         headers = [("Content-Type", "text/html"), ("Content-Length", str(len(body)))]
                         start_response("200 OK", headers)
                         return [body]
-                    except Exception as e:
-                        msg = f"<h1>500 Internal Server Error</h1><p>Failed to load page: {str(e)}</p>"
+                    except Exception as exception:
+                        msg = f"<h1>500 Internal Server Error</h1><p>Failed to load page: {str(exception)}</p>"
                         body = msg.encode("utf-8")
                         headers = [("Content-Type", "text/html"), ("Content-Length", str(len(body)))]
                         start_response("500 Internal Server Error", headers)
@@ -96,8 +106,8 @@ class MyAPI:
             start_response("405 Method Not Allowed", headers)
             return [body]
 
-        except Exception as e:
-            body = f"<h1>500 Internal Server Error</h1><p>{str(e)}</p>".encode("utf-8")
+        except Exception as exception:
+            body = f"<h1>500 Internal Server Error</h1><p>{str(exception)}</p>".encode("utf-8")
             headers = [("Content-Type", "text/html"), ("Content-Length", str(len(body)))]
             start_response("500 Internal Server Error", headers)
             return [body]
